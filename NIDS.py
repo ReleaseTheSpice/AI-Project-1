@@ -5,6 +5,7 @@
 ###############################################################
 
 import csv
+from correlation import uhhhh
 
 class NIDS:
     """class for the network intrusion detection system"""
