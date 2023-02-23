@@ -18,8 +18,11 @@ import pydotplus # is used for plotting the decision tree
 from sklearn.svm import SVR
 from sklearn.feature_selection import RFECV
 from sklearn.feature_selection import RFE
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LinearRegression
+from sklearn.decomposition import PCA
+from sklearn.tree import DecisionTreeClassifier
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
 import numpy
 # from correlation import uhhhh
 
@@ -71,22 +74,26 @@ class NIDS:
         # data = recursiveFeatureElimination(data, 'Label', featureCols, 10)
         # atkCatData = recursiveFeatureElimination(atkCatData, 'attack_cat', featureCols, 10)
 
-        data = linearRegressionAnalysis(data, 'Label', featureCols)
-        atkCatData = linearRegressionAnalysis(atkCatData, 'attack_cat', featureCols)
+        # data = linearRegressionAnalysis(data, 'Label', featureCols)
+        # atkCatData = linearRegressionAnalysis(atkCatData, 'attack_cat', featureCols)
+
+        # data = principalComponentAnalysis(data, 'Label', featureCols, 10)
+        # atkCatData = principalComponentAnalysis(atkCatData, 'attack_cat', featureCols, 10)
+
 
         # Split the data into training and testing sets
         labelTrainX, labelTestX, labelTrainY, labelTestY = train_test_split(
             data[featureCols], data['Label'], test_size=0.2, random_state=1)  # 80% training and 20% test
         catTrainX, catTestX, catTrainY, catTestY = train_test_split(
             atkCatData[featureCols], atkCatData['attack_cat'], test_size=0.2, random_state=1)  # 80% training and 20% test
-        #
+
         decisionTreeClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
         decisionTreeClassify(catTrainX, catTrainY, catTestX, catTestY)
 
 
 #region Analysis functions
 
-def recursiveFeatureElimination(data, target, featureCols, maxScore) -> pandas.DataFrame:
+def recursiveFeatureElimination(data, target, featureCols, maxScore):
     """Performs recursive feature analysis and removes any features above the given score"""
     x = data[featureCols]
     y = data[target]
@@ -103,8 +110,6 @@ def recursiveFeatureElimination(data, target, featureCols, maxScore) -> pandas.D
             #print(f"Removing feature {feature} with score {selector.ranking_[featureCols.index(feature)]}")
             data = data.drop(feature, axis=1)
             featureCols.remove(feature)
-
-    return data
 
 def linearRegressionAnalysis(data, target, featureCols):
     """Performs linear regression analysis on the given data and removes the least relevant half of the features"""
@@ -125,7 +130,38 @@ def linearRegressionAnalysis(data, target, featureCols):
             data = data.drop(feature, axis=1)
             featureCols.remove(feature)
 
-    return data
+def principalComponentAnalysis(data, target, featureCols, numComponents=10):
+    """Performs principal component analysis on the given data and removes every feature except the most relevant"""
+    x = data[featureCols]
+    y = data[target]
+
+    # Use PCA model
+    model = PCA(numComponents)
+    # Train and scale the model
+    x_scaled = StandardScaler().fit_transform(x)
+    pcaFeatures = model.fit_transform(x_scaled)
+
+    # # Bar plot of explained_variance
+    # plt.bar(
+    #     range(1, len(model.explained_variance_) + 1),
+    #     model.explained_variance_
+    # )
+    #
+    # plt.xlabel('PCA Feature')
+    # plt.ylabel('Explained variance')
+    # plt.title('Feature Explained Variance')
+    # plt.show()
+
+    featureCols = ['pc' + str(i) for i in range(1, numComponents + 1)]
+
+    pcaDf = pandas.DataFrame(data=pcaFeatures, columns=featureCols)
+    pcaDf[target] = y
+
+    data = pcaDf
+
+    trainX, testX, trainY, testY = train_test_split(
+         data[featureCols], data[target], test_size=0.2, random_state=1)  # 80% training and 20% test
+    decisionTreeClassify(trainX, trainY, testX, testY)
 
 
 #endregion
