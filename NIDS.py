@@ -15,12 +15,15 @@ from six import StringIO # is used for plotting the decision tree
 from IPython.display import Image # is used for plotting the decision tree
 from IPython.core.display import HTML # is used for showing the confusion matrix
 import pydotplus # is used for plotting the decision tree
-from sklearn.svm import SVR
+from sklearn.svm import LinearSVC
 from sklearn.feature_selection import RFECV
 from sklearn.feature_selection import RFE
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import BaggingClassifier
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.linear_model import Perceptron
 import numpy
 # from correlation import uhhhh
 
@@ -69,11 +72,11 @@ class NIDS:
         atkCatData = data
         atkCatData.dropna(axis='rows', subset=['attack_cat'], inplace=True)
 
-        # data = recursiveFeatureElimination(data, 'Label', featureCols, 10)
-        # atkCatData = recursiveFeatureElimination(atkCatData, 'attack_cat', featureCols, 10)
+        data = recursiveFeatureElimination(data, 'Label', featureCols, 10)
+        atkCatData = recursiveFeatureElimination(atkCatData, 'attack_cat', featureCols, 10)
 
-        data = linearRegressionAnalysis(data, 'Label', featureCols)
-        atkCatData = linearRegressionAnalysis(atkCatData, 'attack_cat', featureCols)
+        # data = linearRegressionAnalysis(data, 'Label', featureCols)
+        # atkCatData = linearRegressionAnalysis(atkCatData, 'attack_cat', featureCols)
 
         # Split the data into training and testing sets
         labelTrainX, labelTestX, labelTrainY, labelTestY = train_test_split(
@@ -84,8 +87,11 @@ class NIDS:
         #decisionTreeClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
         #decisionTreeClassify(catTrainX, catTrainY, catTestX, catTestY)
 
-        logisticRegressionClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
-        logisticRegressionClassify(catTrainX, catTrainY, catTestX, catTestY)
+        #logisticRegressionClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
+        #logisticRegressionClassify(catTrainX, catTrainY, catTestX, catTestY)
+
+        SVCClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
+        SVCClassify(catTrainX, catTrainY, catTestX, catTestY)
 
 
 #region Analysis functions
@@ -153,16 +159,24 @@ def decisionTreeClassify(x, y, testX, testY ):
 def logisticRegressionClassify(x, y, testX, testY):
     """Classify the data using linear regression"""
 
-    #Linear Regression is used here
+    # Create logistic regression classifier object
     reg = LogisticRegression()
-
-    #reg = ns.MultitaskClassifier(reg, n_hidden_features=5, n_clusters=2, type_clust="gmm")
-
     # Adjust the model
     reg.fit(x, y)
-
     # Classification report
     prediction = reg.predict(testX)
+    print("Accuracy:", metrics.accuracy_score(testY, prediction))
+    print(metrics.classification_report(testY, prediction))
+
+def SVCClassify(x, y, testX, testY):
+    """Classify the data using a perceptron classifier"""
+
+    n_estimators = 10
+    clf = OneVsRestClassifier(BaggingClassifier(LinearSVC(dual=False), max_samples=1.0 / n_estimators,
+                                                    n_estimators=n_estimators))
+    clf.fit(x, y)
+    prediction = clf.predict(testX)
+    print("Accuracy:", metrics.accuracy_score(testY, prediction))
     print(metrics.classification_report(testY, prediction))
 
 #endregion
