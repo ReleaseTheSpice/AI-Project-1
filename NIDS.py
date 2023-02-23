@@ -75,8 +75,8 @@ class NIDS:
         atkCatData = data
         atkCatData.dropna(axis='rows', subset=['attack_cat'], inplace=True)
 
-        recursiveFeatureElimination(data, 'Label', featureCols, 10)
-        recursiveFeatureElimination(atkCatData, 'attack_cat', featureCols, 10)
+        #recursiveFeatureElimination(data, 'Label', featureCols, 10)
+        #recursiveFeatureElimination(atkCatData, 'attack_cat', featureCols, 10)
 
         #linearRegressionAnalysis(data, 'Label', featureCols)
         #linearRegressionAnalysis(atkCatData, 'attack_cat', featureCols)
@@ -91,14 +91,14 @@ class NIDS:
         catTrainX, catTestX, catTrainY, catTestY = train_test_split(
             atkCatData[featureCols], atkCatData['attack_cat'], test_size=0.2, random_state=1)  # 80% training and 20% test
 
-        decisionTreeClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
-        decisionTreeClassify(catTrainX, catTrainY, catTestX, catTestY)
+        #decisionTreeClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
+        #decisionTreeClassify(catTrainX, catTrainY, catTestX, catTestY)
 
         #logisticRegressionClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
         #logisticRegressionClassify(catTrainX, catTrainY, catTestX, catTestY)
 
-        #SVCClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
-        #SVCClassify(catTrainX, catTrainY, catTestX, catTestY)
+        #SupportVectorClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
+        #SupportVectorClassify(catTrainX, catTrainY, catTestX, catTestY)
 
 
 
@@ -195,7 +195,7 @@ def logisticRegressionClassify(x, y, testX, testY):
     print("Accuracy:", metrics.accuracy_score(testY, prediction))
     print(metrics.classification_report(testY, prediction))
 
-def SVCClassify(x, y, testX, testY):
+def SupportVectorClassify(x, y, testX, testY):
     """Classify the data using a perceptron classifier"""
 
     n_estimators = 10
