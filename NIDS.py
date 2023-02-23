@@ -15,6 +15,7 @@ from six import StringIO # is used for plotting the decision tree
 from IPython.display import Image # is used for plotting the decision tree
 from IPython.core.display import HTML # is used for showing the confusion matrix
 import pydotplus # is used for plotting the decision tree
+import time
 from sklearn.svm import LinearSVC
 from sklearn.feature_selection import RFECV
 from sklearn.feature_selection import RFE
@@ -78,8 +79,8 @@ class NIDS:
         #recursiveFeatureElimination(data, 'Label', featureCols, 10)
         #recursiveFeatureElimination(atkCatData, 'attack_cat', featureCols, 10)
 
-        #linearRegressionAnalysis(data, 'Label', featureCols)
-        #linearRegressionAnalysis(atkCatData, 'attack_cat', featureCols)
+        linearRegressionAnalysis(data, 'Label', featureCols)
+        linearRegressionAnalysis(atkCatData, 'attack_cat', featureCols)
 
         #principalComponentAnalysis(data, 'Label', featureCols, 10)
         #principalComponentAnalysis(atkCatData, 'attack_cat', featureCols, 10)
@@ -97,8 +98,8 @@ class NIDS:
         #logisticRegressionClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
         #logisticRegressionClassify(catTrainX, catTrainY, catTestX, catTestY)
 
-        #SupportVectorClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
-        #SupportVectorClassify(catTrainX, catTrainY, catTestX, catTestY)
+        SupportVectorClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
+        SupportVectorClassify(catTrainX, catTrainY, catTestX, catTestY)
 
 
 
@@ -106,6 +107,8 @@ class NIDS:
 
 def recursiveFeatureElimination(data, target, featureCols, maxScore):
     """Performs recursive feature analysis and removes any features above the given score"""
+    st = time.time()
+
     x = data[featureCols]
     y = data[target]
 
@@ -122,8 +125,13 @@ def recursiveFeatureElimination(data, target, featureCols, maxScore):
             data = data.drop(feature, axis=1)
             featureCols.remove(feature)
 
+    et = time.time()
+    print("Time elapsed during RFE: ", et - st)
+
 def linearRegressionAnalysis(data, target, featureCols):
     """Performs linear regression analysis on the given data and removes the least relevant half of the features"""
+    st = time.time()
+
     x = data[featureCols]
     y = data[target]
 
@@ -141,8 +149,13 @@ def linearRegressionAnalysis(data, target, featureCols):
             data = data.drop(feature, axis=1)
             featureCols.remove(feature)
 
+    et = time.time()
+    print("Time elapsed LR: ", et - st)
+
 def principalComponentAnalysis(data, target, featureCols, numComponents=10):
     """Performs principal component analysis on the given data and removes every feature except the most relevant"""
+    st = time.time()
+
     x = data[featureCols]
     y = data[target]
 
@@ -159,10 +172,16 @@ def principalComponentAnalysis(data, target, featureCols, numComponents=10):
 
     data = pcaDf
 
+    et = time.time()
+    print("Time elapsed PCA: ", et - st)
+
+
     trainX, testX, trainY, testY = train_test_split(
          data[featureCols], data[target], test_size=0.2, random_state=1)  # 80% training and 20% test
     #decisionTreeClassify(trainX, trainY, testX, testY)
     logisticRegressionClassify(trainX, trainY, testX, testY)
+
+
 
 
 #endregion
@@ -172,6 +191,8 @@ def principalComponentAnalysis(data, target, featureCols, numComponents=10):
 
 def decisionTreeClassify(x, y, testX, testY ):
     """Classify the data"""
+    st = time.time()
+
     # Create Decision Tree classifer object
     clf = DecisionTreeClassifier()
     # # Train Decision Tree Classifer
@@ -179,12 +200,16 @@ def decisionTreeClassify(x, y, testX, testY ):
     # Predict the response for test dataset
     prediction = clf.predict(testX)
     # Model Accuracy, how often is the classifier correct?
+
     print("Accuracy:", metrics.accuracy_score(testY, prediction))
     print(metrics.classification_report(testY, prediction))
+    et = time.time()
+    print("Time elapsed DTC: ", et - st)
 
 
 def logisticRegressionClassify(x, y, testX, testY):
     """Classify the data using linear regression"""
+    st = time.time()
 
     # Create logistic regression classifier object
     reg = LogisticRegression()
@@ -192,19 +217,26 @@ def logisticRegressionClassify(x, y, testX, testY):
     reg.fit(x, y)
     # Classification report
     prediction = reg.predict(testX)
+
     print("Accuracy:", metrics.accuracy_score(testY, prediction))
     print(metrics.classification_report(testY, prediction))
+    et = time.time()
+    print("Time elapsed LRC: ", et - st)
 
 def SupportVectorClassify(x, y, testX, testY):
     """Classify the data using a perceptron classifier"""
+    st = time.time()
 
     n_estimators = 10
     clf = OneVsRestClassifier(BaggingClassifier(LinearSVC(dual=False), max_samples=1.0 / n_estimators,
                                                     n_estimators=n_estimators))
     clf.fit(x, y)
     prediction = clf.predict(testX)
+
     print("Accuracy:", metrics.accuracy_score(testY, prediction))
     print(metrics.classification_report(testY, prediction))
+    et = time.time()
+    print("Time elapsed SVC: ", et - st)
 
 #endregion
 
