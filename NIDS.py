@@ -63,127 +63,90 @@ class NIDS:
         data['state'] = pandas.factorize(data['state'])[0]
         data['service'] = pandas.factorize(data['service'])[0]
 
-        #data2 = featureAnalysis(data, featureCols)
-        rfe = recursiveFeatureElimination(data, featureCols)
-        #print(rfe.head())
+        # Make a new dataframe for predicting the attack category
+        # It has only the rows that have an attack_cat (drop all rows where atkCat is null)
+        atkCatData = data
+        atkCatData.dropna(axis='rows', subset=['attack_cat'], inplace=True)
 
-        classify(data, featureCols)
+        # data = recursiveFeatureElimination(data, 'Label', featureCols, 10)
+        # atkCatData = recursiveFeatureElimination(atkCatData, 'attack_cat', featureCols, 10)
 
+        data = linearRegressionAnalysis(data, 'Label', featureCols)
+        atkCatData = linearRegressionAnalysis(atkCatData, 'attack_cat', featureCols)
 
-def recursiveFeatureElimination(data, featureCols):
-    """Recursive feature elimination"""
-    x = data[featureCols]  # Features
-    y = data['Label']  # Target variable
-    scaledX, remainingX, scaledY, remainingY = train_test_split(x, y, test_size=0.5,
-                                                                random_state=1)  # 80% training and 20% test
-    nofList = numpy.arange(1, len(featureCols))
-    highScore = 0
-    scoreList = []
-    nof = 0
-
-    # for i in range(len(nofList)):
-    #     print("starting iteration " + str(i))
-    #     trainX, testX, trainY, testY = train_test_split(x, y, test_size=0.2,
-    #                                                     random_state=1)  # 80% training and 20% test
-    #     # Linear regression model?
-    #     model = LinearRegression()
-    #     # perform feature selection
-    #     rfe = RFE(model, n_features_to_select=nofList[i])
-    #     xTrainRfe = rfe.fit_transform(trainX, trainY)
-    #     xTestRfe = rfe.transform(testX)
-    #     # fit the model
-    #     model.fit(xTrainRfe, trainY)
-    #     score = model.score(xTestRfe, testY)
-    #     scoreList.append(score)
-    #     if (score > highScore):
-    #         highScore = score
-    #         nof = nofList[i]
+        # Split the data into training and testing sets
+        labelTrainX, labelTestX, labelTrainY, labelTestY = train_test_split(
+            data[featureCols], data['Label'], test_size=0.2, random_state=1)  # 80% training and 20% test
+        catTrainX, catTestX, catTrainY, catTestY = train_test_split(
+            atkCatData[featureCols], atkCatData['attack_cat'], test_size=0.2, random_state=1)  # 80% training and 20% test
+        #
+        decisionTreeClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
+        decisionTreeClassify(catTrainX, catTrainY, catTestX, catTestY)
 
 
-    #Linear regression model?
-    #model = LinearRegression()
-    # model = SVR(kernel='linear')
-    # # perform feature selection
-    # rfe = RFE(model, n_features_to_select=43)
-    # xRfe = rfe.fit_transform(x, y)
-    # # fit the model
-    # model.fit(xRfe, y)
-    # print(rfe.support_)
-    # print(rfe.ranking_)
+#region Analysis functions
 
-    min_features_to_select = 5
-    #estimator = SVR(kernel="linear")
-    estimator = DecisionTreeClassifier()
+def recursiveFeatureElimination(data, target, featureCols, maxScore) -> pandas.DataFrame:
+    """Performs recursive feature analysis and removes any features above the given score"""
+    x = data[featureCols]
+    y = data[target]
 
-    selector = RFE(estimator, step=1)
+    # Use a decision tree model
+    model = DecisionTreeClassifier()
+    # Feed the decision tree estimator to the RFE function to determine the most important features
+    selector = RFE(model, step=1)
+    # Fit it to our data frame
     selector.fit(x, y)
 
-    #print(f"Optimal number of features: {selector.nfeatures}")
-    print(f"Feature ranking: {selector.ranking_}")
+    for feature in featureCols:
+        if selector.ranking_[featureCols.index(feature)] > maxScore:
+            #print(f"Removing feature {feature} with score {selector.ranking_[featureCols.index(feature)]}")
+            data = data.drop(feature, axis=1)
+            featureCols.remove(feature)
 
-    # print("Optimal number of features: %d" % nof)
-    # print("Score with %d features: %f" % (nof, highScore))
+    return data
 
-def featureAnalysis(data, featureCols):
-    """Analyze the features"""
-    # Create a new dataframe with only the features
-    data2 = data[featureCols]
+def linearRegressionAnalysis(data, target, featureCols):
+    """Performs linear regression analysis on the given data and removes the least relevant half of the features"""
+    x = data[featureCols]
+    y = data[target]
 
-    # Create a new dataframe with only the features that have a correlation of 0.5 or higher
-    data3 = data2.corr()
-    data3 = data3[(data3 > 0.5) | (data3 < -0.5)]
-    data3 = data3.dropna(axis='columns', how='all')
-    data3 = data3.dropna(axis='index', how='all')
-    data3 = data3.dropna(axis='columns', how='all')
-    data3 = data3.dropna(axis='index', how='all')
-    print(data3)
+    # Use linear regression model
+    model = LinearRegression()
+    # Train the model
+    model.fit(x, y)
+    # Get the coefficients
+    coefficients = model.coef_
+    avg = numpy.average(coefficients)
 
-    # Create a new dataframe with only the features that have a correlation of 0.5 or higher
-    data4 = data2.corr()
-    data4 = data4[(data4 > 0.5) | (data4 < -0.5)]
-    data4 = data4.dropna(axis='columns', how='all')
-    data4 = data4.dropna(axis='index', how='all')
-    data4 = data4.dropna(axis='columns', how='all')
-    data4 = data4.dropna(axis='index', how='all')
-    print(data4)
+    for feature in featureCols:
+        if coefficients[featureCols.index(feature)] < avg:
+            #print(f"Removing feature {feature} with coefficient {coefficients[featureCols.index(feature)]}")
+            data = data.drop(feature, axis=1)
+            featureCols.remove(feature)
 
-    return data2
+    return data
 
-def classify(data, featureCols):
+
+#endregion
+
+
+#region Classification functions
+
+def decisionTreeClassify(x, y, testX, testY ):
     """Classify the data"""
-    # Make a new dataframe with only the rows that have an attack_cat (drop all rows where atkCat is null)
-    atkCatData = data
-    atkCatData.dropna(axis='rows', subset=['attack_cat'], inplace=True)
-
-    x = data[featureCols]  # Features
-    yLabel = data['Label']  # Target variable
-    xAtkCat = atkCatData[featureCols]  # Features
-    yAtkCat = atkCatData['attack_cat']  # Target variable
-
-    trainX, testX, trainY, testY = train_test_split(x, yLabel, test_size=0.2,
-                                                    random_state=1)  # 80% training and 20% test
-    catTrainX, catTestX, catTrainY, catTestY = train_test_split(xAtkCat, yAtkCat, test_size=0.2,
-                                                                random_state=1)  # 80% training and 20% test
-
     # Create Decision Tree classifer object
     clf = DecisionTreeClassifier()
-    atkCatClf = DecisionTreeClassifier()
-
     # # Train Decision Tree Classifer
-    clf = clf.fit(trainX, trainY)
-    atkCatClf = atkCatClf.fit(catTrainX, catTrainY)
-
+    clf = clf.fit(x, y)
     # Predict the response for test dataset
     prediction = clf.predict(testX)
-    atkCatPrediction = atkCatClf.predict(catTestX)
-
     # Model Accuracy, how often is the classifier correct?
     print("Accuracy:", metrics.accuracy_score(testY, prediction))
     print(metrics.classification_report(testY, prediction))
 
-    # Model Accuracy, how often is the classifier correct?
-    print("CAT Accuracy:", metrics.accuracy_score(catTestY, atkCatPrediction))
-    print(metrics.classification_report(catTestY, atkCatPrediction))
+
+#endregion
 
 if (__name__ == "__main__"):
     NIDS()
