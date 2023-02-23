@@ -78,21 +78,21 @@ class NIDS:
         # data = linearRegressionAnalysis(data, 'Label', featureCols)
         # atkCatData = linearRegressionAnalysis(atkCatData, 'attack_cat', featureCols)
 
-        # data = principalComponentAnalysis(data, 'Label', featureCols, 10)
-        # atkCatData = principalComponentAnalysis(atkCatData, 'attack_cat', featureCols, 10)
+        data = principalComponentAnalysis(data, 'Label', featureCols, 10)
+        atkCatData = principalComponentAnalysis(atkCatData, 'attack_cat', featureCols, 10)
 
 
-        # Split the data into training and testing sets
-        labelTrainX, labelTestX, labelTrainY, labelTestY = train_test_split(
-            data[featureCols], data['Label'], test_size=0.2, random_state=1)  # 80% training and 20% test
-        catTrainX, catTestX, catTrainY, catTestY = train_test_split(
-            atkCatData[featureCols], atkCatData['attack_cat'], test_size=0.2, random_state=1)  # 80% training and 20% test
+        # # Split the data into training and testing sets
+        # labelTrainX, labelTestX, labelTrainY, labelTestY = train_test_split(
+        #     data[featureCols], data['Label'], test_size=0.2, random_state=1)  # 80% training and 20% test
+        # catTrainX, catTestX, catTrainY, catTestY = train_test_split(
+        #     atkCatData[featureCols], atkCatData['attack_cat'], test_size=0.2, random_state=1)  # 80% training and 20% test
         #
         #decisionTreeClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
         #decisionTreeClassify(catTrainX, catTrainY, catTestX, catTestY)
 
-        logisticRegressionClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
-        logisticRegressionClassify(catTrainX, catTrainY, catTestX, catTestY)
+        # logisticRegressionClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
+        # logisticRegressionClassify(catTrainX, catTrainY, catTestX, catTestY)
 
 
 #region Analysis functions
@@ -145,17 +145,6 @@ def principalComponentAnalysis(data, target, featureCols, numComponents=10):
     x_scaled = StandardScaler().fit_transform(x)
     pcaFeatures = model.fit_transform(x_scaled)
 
-    # # Bar plot of explained_variance
-    # plt.bar(
-    #     range(1, len(model.explained_variance_) + 1),
-    #     model.explained_variance_
-    # )
-    #
-    # plt.xlabel('PCA Feature')
-    # plt.ylabel('Explained variance')
-    # plt.title('Feature Explained Variance')
-    # plt.show()
-
     featureCols = ['pc' + str(i) for i in range(1, numComponents + 1)]
 
     pcaDf = pandas.DataFrame(data=pcaFeatures, columns=featureCols)
@@ -165,7 +154,8 @@ def principalComponentAnalysis(data, target, featureCols, numComponents=10):
 
     trainX, testX, trainY, testY = train_test_split(
          data[featureCols], data[target], test_size=0.2, random_state=1)  # 80% training and 20% test
-    decisionTreeClassify(trainX, trainY, testX, testY)
+    #decisionTreeClassify(trainX, trainY, testX, testY)
+    logisticRegressionClassify(trainX, trainY, testX, testY)
 
 
 #endregion
