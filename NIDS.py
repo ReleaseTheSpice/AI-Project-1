@@ -20,6 +20,7 @@ from sklearn.feature_selection import RFECV
 from sklearn.feature_selection import RFE
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LogisticRegression
 import numpy
 # from correlation import uhhhh
 
@@ -80,8 +81,11 @@ class NIDS:
         catTrainX, catTestX, catTrainY, catTestY = train_test_split(
             atkCatData[featureCols], atkCatData['attack_cat'], test_size=0.2, random_state=1)  # 80% training and 20% test
         #
-        decisionTreeClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
-        decisionTreeClassify(catTrainX, catTrainY, catTestX, catTestY)
+        #decisionTreeClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
+        #decisionTreeClassify(catTrainX, catTrainY, catTestX, catTestY)
+
+        logisticRegressionClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
+        logisticRegressionClassify(catTrainX, catTrainY, catTestX, catTestY)
 
 
 #region Analysis functions
@@ -145,6 +149,21 @@ def decisionTreeClassify(x, y, testX, testY ):
     print("Accuracy:", metrics.accuracy_score(testY, prediction))
     print(metrics.classification_report(testY, prediction))
 
+
+def logisticRegressionClassify(x, y, testX, testY):
+    """Classify the data using linear regression"""
+
+    #Linear Regression is used here
+    reg = LogisticRegression()
+
+    #reg = ns.MultitaskClassifier(reg, n_hidden_features=5, n_clusters=2, type_clust="gmm")
+
+    # Adjust the model
+    reg.fit(x, y)
+
+    # Classification report
+    prediction = reg.predict(testX)
+    print(metrics.classification_report(testY, prediction))
 
 #endregion
 
