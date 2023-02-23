@@ -16,7 +16,9 @@ from IPython.display import Image # is used for plotting the decision tree
 from IPython.core.display import HTML # is used for showing the confusion matrix
 import pydotplus # is used for plotting the decision tree
 from sklearn.svm import SVR
+from sklearn.feature_selection import RFECV
 from sklearn.feature_selection import RFE
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LinearRegression
 import numpy
 # from correlation import uhhhh
@@ -72,6 +74,8 @@ def recursiveFeatureElimination(data, featureCols):
     """Recursive feature elimination"""
     x = data[featureCols]  # Features
     y = data['Label']  # Target variable
+    scaledX, remainingX, scaledY, remainingY = train_test_split(x, y, test_size=0.5,
+                                                                random_state=1)  # 80% training and 20% test
     nofList = numpy.arange(1, len(featureCols))
     highScore = 0
     scoreList = []
@@ -98,14 +102,24 @@ def recursiveFeatureElimination(data, featureCols):
 
     #Linear regression model?
     #model = LinearRegression()
-    model = SVR(kernel='linear')
-    # perform feature selection
-    rfe = RFE(model, n_features_to_select=43)
-    xRfe = rfe.fit_transform(x, y)
-    # fit the model
-    model.fit(xRfe, y)
-    print(rfe.support_)
-    print(rfe.ranking_)
+    # model = SVR(kernel='linear')
+    # # perform feature selection
+    # rfe = RFE(model, n_features_to_select=43)
+    # xRfe = rfe.fit_transform(x, y)
+    # # fit the model
+    # model.fit(xRfe, y)
+    # print(rfe.support_)
+    # print(rfe.ranking_)
+
+    min_features_to_select = 5
+    #estimator = SVR(kernel="linear")
+    estimator = DecisionTreeClassifier()
+
+    selector = RFE(estimator, step=1)
+    selector.fit(x, y)
+
+    #print(f"Optimal number of features: {selector.nfeatures}")
+    print(f"Feature ranking: {selector.ranking_}")
 
     # print("Optimal number of features: %d" % nof)
     # print("Score with %d features: %f" % (nof, highScore))
