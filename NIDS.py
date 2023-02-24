@@ -5,36 +5,27 @@
 ###############################################################
 
 import pandas
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
-
 from sklearn import metrics # is used to create classification results
 from sklearn import preprocessing # is used to encode the data
-from sklearn.tree import export_graphviz # is used for plotting the decision tree
-from six import StringIO # is used for plotting the decision tree
-from IPython.display import Image # is used for plotting the decision tree
-from IPython.core.display import HTML # is used for showing the confusion matrix
-import pydotplus # is used for plotting the decision tree
 import time
 from sklearn.svm import LinearSVC
-from sklearn.feature_selection import RFECV
 from sklearn.feature_selection import RFE
 from sklearn.linear_model import LinearRegression
 from sklearn.decomposition import PCA
 from sklearn.tree import DecisionTreeClassifier
-import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import BaggingClassifier
 from sklearn.multiclass import OneVsRestClassifier
-from sklearn.linear_model import Perceptron
 import numpy
-# from correlation import uhhhh
+import sys
+import pickle
 
 class NIDS:
     """class for the network intrusion detection system"""
 
-    def __init__(self):
+    def __init__(self, dataFile, classificationMethod, targetTask, model=None):
         """Constructor"""
         colNames = ["srcip","sport","dstip","dsport","proto","state","dur","sbytes","dbytes","sttl","dttl","sloss",
                     "dloss","service","Sload","Dload","Spkts","Dpkts","swin","dwin","stcpb","dtcpb","smeansz","dmeansz",
@@ -43,7 +34,9 @@ class NIDS:
                     "ct_srv_src","ct_srv_dst","ct_dst_ltm","ct_src_ltm","ct_src_dport_ltm","ct_dst_sport_ltm",
                     "ct_dst_src_ltm","attack_cat","Label"]
 
-        data = pandas.read_csv("UNSW-NB15-BALANCED-TRAIN.csv", names=colNames, skiprows=1)
+        self.modelName = "cat-"
+
+        data = pandas.read_csv(dataFile, names=colNames, skiprows=1)
 
         # ct_flw_http_mthd and is_ftp_login have a lot of unfilled cells, remove them
         data = data.drop(['ct_flw_http_mthd', 'is_ftp_login'], axis=1)
@@ -71,174 +64,200 @@ class NIDS:
         data['state'] = pandas.factorize(data['state'])[0]
         data['service'] = pandas.factorize(data['service'])[0]
 
-        # Make a new dataframe for predicting the attack category
-        # It has only the rows that have an attack_cat (drop all rows where atkCat is null)
-        atkCatData = data
-        atkCatData.dropna(axis='rows', subset=['attack_cat'], inplace=True)
+        if targetTask == 'Label':
+            #Do something
+            print("Label")
+        elif targetTask == 'attack_cat':
+            # # Make a new dataframe for predicting the attack category
+            # # It has only the rows that have an attack_cat (drop all rows where atkCat is null)
+            # atkCatData = data
+            # atkCatData.dropna(axis='rows', subset=['attack_cat'], inplace=True)
+            # We are trying to predict the attack category, so remove any rows where it is null
+            data.dropna(axis='rows', subset=['attack_cat'], inplace=True)
+        else:
+            print(f"Task not recognized: {targetTask}.  Please choose 'Label' or 'attack_cat'.")
+            sys.exit()
 
-        #recursiveFeatureElimination(data, 'Label', featureCols, 10)
-        #recursiveFeatureElimination(atkCatData, 'attack_cat', featureCols, 10)
 
-        linearRegressionAnalysis(data, 'Label', featureCols)
-        linearRegressionAnalysis(atkCatData, 'attack_cat', featureCols)
+        self.recursiveFeatureElimination(data, targetTask, featureCols, 10)
 
-        #principalComponentAnalysis(data, 'Label', featureCols, 10)
-        #principalComponentAnalysis(atkCatData, 'attack_cat', featureCols, 10)
+        #self.linearRegressionAnalysis(data, targetTask, featureCols)
+
+        #self.principalComponentAnalysis(data, targetTask, featureCols, 10)
 
 
         # Split the data into training and testing sets
         labelTrainX, labelTestX, labelTrainY, labelTestY = train_test_split(
-            data[featureCols], data['Label'], test_size=0.2, random_state=1)  # 80% training and 20% test
-        catTrainX, catTestX, catTrainY, catTestY = train_test_split(
-            atkCatData[featureCols], atkCatData['attack_cat'], test_size=0.2, random_state=1)  # 80% training and 20% test
+            data[featureCols], data[targetTask], test_size=0.2, random_state=1)  # 80% training and 20% test
 
-        #decisionTreeClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
-        #decisionTreeClassify(catTrainX, catTrainY, catTestX, catTestY)
-
-        #logisticRegressionClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
-        #logisticRegressionClassify(catTrainX, catTrainY, catTestX, catTestY)
-
-        SupportVectorClassify(labelTrainX, labelTrainY, labelTestX, labelTestY)
-        SupportVectorClassify(catTrainX, catTrainY, catTestX, catTestY)
+        self.callClassifier(classificationMethod, labelTrainX, labelTrainY, labelTestX, labelTestY)
 
 
 
-#region Analysis functions
+    #region Analysis functions
 
-def recursiveFeatureElimination(data, target, featureCols, maxScore):
-    """Performs recursive feature analysis and removes any features above the given score"""
-    st = time.time()
+    def recursiveFeatureElimination(self, data, target, featureCols, maxScore):
+        """Performs recursive feature analysis and removes any features above the given score"""
+        st = time.time()
 
-    x = data[featureCols]
-    y = data[target]
+        x = data[featureCols]
+        y = data[target]
 
-    # Use a decision tree model
-    model = DecisionTreeClassifier()
-    # Feed the decision tree estimator to the RFE function to determine the most important features
-    selector = RFE(model, step=1)
-    # Fit it to our data frame
-    selector.fit(x, y)
+        # Use a decision tree model
+        model = DecisionTreeClassifier()
+        # Feed the decision tree estimator to the RFE function to determine the most important features
+        selector = RFE(model, step=1)
+        # Fit it to our data frame
+        selector.fit(x, y)
 
-    for feature in featureCols:
-        if selector.ranking_[featureCols.index(feature)] > maxScore:
-            #print(f"Removing feature {feature} with score {selector.ranking_[featureCols.index(feature)]}")
-            data = data.drop(feature, axis=1)
-            featureCols.remove(feature)
+        for feature in featureCols:
+            if selector.ranking_[featureCols.index(feature)] > maxScore:
+                #print(f"Removing feature {feature} with score {selector.ranking_[featureCols.index(feature)]}")
+                data = data.drop(feature, axis=1)
+                featureCols.remove(feature)
 
-    et = time.time()
-    print("Time elapsed during RFE: ", et - st)
+        et = time.time()
+        print("Time elapsed during RFE: ", et - st)
+        self.modelName += "RFE-"
 
-def linearRegressionAnalysis(data, target, featureCols):
-    """Performs linear regression analysis on the given data and removes the least relevant half of the features"""
-    st = time.time()
+    def linearRegressionAnalysis(self, data, target, featureCols):
+        """Performs linear regression analysis on the given data and removes the least relevant half of the features"""
+        st = time.time()
 
-    x = data[featureCols]
-    y = data[target]
+        x = data[featureCols]
+        y = data[target]
 
-    # Use linear regression model
-    model = LinearRegression()
-    # Train the model
-    model.fit(x, y)
-    # Get the coefficients
-    coefficients = model.coef_
-    avg = numpy.average(coefficients)
+        # Use linear regression model
+        model = LinearRegression()
+        # Train the model
+        model.fit(x, y)
+        # Get the coefficients
+        coefficients = model.coef_
+        avg = numpy.average(coefficients)
 
-    for feature in featureCols:
-        if coefficients[featureCols.index(feature)] < avg:
-            #print(f"Removing feature {feature} with coefficient {coefficients[featureCols.index(feature)]}")
-            data = data.drop(feature, axis=1)
-            featureCols.remove(feature)
+        for feature in featureCols:
+            if coefficients[featureCols.index(feature)] < avg:
+                #print(f"Removing feature {feature} with coefficient {coefficients[featureCols.index(feature)]}")
+                data = data.drop(feature, axis=1)
+                featureCols.remove(feature)
 
-    et = time.time()
-    print("Time elapsed LR: ", et - st)
+        et = time.time()
+        print("Time elapsed LR: ", et - st)
+        self.modelName += "LR-"
 
-def principalComponentAnalysis(data, target, featureCols, numComponents=10):
-    """Performs principal component analysis on the given data and removes every feature except the most relevant"""
-    st = time.time()
+    def principalComponentAnalysis(self, data, target, featureCols, numComponents=10):
+        """Performs principal component analysis on the given data and removes every feature except the most relevant"""
+        st = time.time()
 
-    x = data[featureCols]
-    y = data[target]
+        x = data[featureCols]
+        y = data[target]
 
-    # Use PCA model
-    model = PCA(numComponents)
-    # Train and scale the model
-    x_scaled = StandardScaler().fit_transform(x)
-    pcaFeatures = model.fit_transform(x_scaled)
+        # Use PCA model
+        model = PCA(numComponents)
+        # Train and scale the model
+        x_scaled = StandardScaler().fit_transform(x)
+        pcaFeatures = model.fit_transform(x_scaled)
 
-    featureCols = ['pc' + str(i) for i in range(1, numComponents + 1)]
+        featureCols = ['pc' + str(i) for i in range(1, numComponents + 1)]
 
-    pcaDf = pandas.DataFrame(data=pcaFeatures, columns=featureCols)
-    pcaDf[target] = y
+        pcaDf = pandas.DataFrame(data=pcaFeatures, columns=featureCols)
+        pcaDf[target] = y
 
-    data = pcaDf
+        data = pcaDf
 
-    et = time.time()
-    print("Time elapsed PCA: ", et - st)
-
-
-    trainX, testX, trainY, testY = train_test_split(
-         data[featureCols], data[target], test_size=0.2, random_state=1)  # 80% training and 20% test
-    #decisionTreeClassify(trainX, trainY, testX, testY)
-    logisticRegressionClassify(trainX, trainY, testX, testY)
+        et = time.time()
+        print("Time elapsed PCA: ", et - st)
 
 
+        trainX, testX, trainY, testY = train_test_split(
+             data[featureCols], data[target], test_size=0.2, random_state=1)  # 80% training and 20% test
+        self.modelName += "PCA-"
+        self.callClassifier(sys.argv[2], trainX, trainY, testX, testY)
+
+    #endregion
 
 
-#endregion
+    #region Classification
+
+    def callClassifier(self, classifier, trainX, trainY, testX, testY):
+        """Calls the given classifier function with the given data"""
+        print(f"Calling classifier {classifier}")
+        if (classifier == 'dtc'):
+            self.decisionTreeClassify(trainX, trainY, testX, testY)
+        elif (classifier == 'lrc'):
+            self.logisticRegressionClassify(trainX, trainY, testX, testY)
+        elif (classifier == 'svc'):
+            self.SupportVectorClassify(trainX, trainY, testX, testY)
+        else:
+            print("Invalid classifier")
+
+    def decisionTreeClassify(self, x, y, testX, testY ):
+        """Classify the data"""
+        st = time.time()
+
+        # Create Decision Tree classifer object
+        clf = DecisionTreeClassifier()
+        # # Train Decision Tree Classifer
+        clf = clf.fit(x, y)
+        # Predict the response for test dataset
+        prediction = clf.predict(testX)
+        # Model Accuracy, how often is the classifier correct?
+
+        print("Accuracy:", metrics.accuracy_score(testY, prediction))
+        print(metrics.classification_report(testY, prediction))
+        et = time.time()
+        print("Time elapsed DTC: ", et - st)
+
+        # Save the model
+        self.modelName += "DTC.sav"
+        pickle.dump(clf, open(self.modelName, 'wb'))
 
 
-#region Classification functions
+    def logisticRegressionClassify(self, x, y, testX, testY):
+        """Classify the data using linear regression"""
+        st = time.time()
 
-def decisionTreeClassify(x, y, testX, testY ):
-    """Classify the data"""
-    st = time.time()
+        # Create logistic regression classifier object
+        reg = LogisticRegression()
+        # Adjust the model
+        reg.fit(x, y)
+        # Classification report
+        prediction = reg.predict(testX)
 
-    # Create Decision Tree classifer object
-    clf = DecisionTreeClassifier()
-    # # Train Decision Tree Classifer
-    clf = clf.fit(x, y)
-    # Predict the response for test dataset
-    prediction = clf.predict(testX)
-    # Model Accuracy, how often is the classifier correct?
+        print("Accuracy:", metrics.accuracy_score(testY, prediction))
+        print(metrics.classification_report(testY, prediction))
+        et = time.time()
+        print("Time elapsed LRC: ", et - st)
 
-    print("Accuracy:", metrics.accuracy_score(testY, prediction))
-    print(metrics.classification_report(testY, prediction))
-    et = time.time()
-    print("Time elapsed DTC: ", et - st)
+        # Save the model
+        self.modelName += "LRC.sav"
+        pickle.dump(reg, open(self.modelName, 'wb'))
 
+    def SupportVectorClassify(self, x, y, testX, testY):
+        """Classify the data using a perceptron classifier"""
+        st = time.time()
 
-def logisticRegressionClassify(x, y, testX, testY):
-    """Classify the data using linear regression"""
-    st = time.time()
+        n_estimators = 10
+        clf = OneVsRestClassifier(BaggingClassifier(LinearSVC(dual=False), max_samples=1.0 / n_estimators,
+                                                        n_estimators=n_estimators))
+        clf.fit(x, y)
+        prediction = clf.predict(testX)
 
-    # Create logistic regression classifier object
-    reg = LogisticRegression()
-    # Adjust the model
-    reg.fit(x, y)
-    # Classification report
-    prediction = reg.predict(testX)
+        print("Accuracy:", metrics.accuracy_score(testY, prediction))
+        print(metrics.classification_report(testY, prediction))
+        et = time.time()
+        print("Time elapsed SVC: ", et - st)
 
-    print("Accuracy:", metrics.accuracy_score(testY, prediction))
-    print(metrics.classification_report(testY, prediction))
-    et = time.time()
-    print("Time elapsed LRC: ", et - st)
+        # Save the model
+        self.modelName += "SVC.sav"
+        pickle.dump(clf, open(self.modelName, 'wb'))
 
-def SupportVectorClassify(x, y, testX, testY):
-    """Classify the data using a perceptron classifier"""
-    st = time.time()
-
-    n_estimators = 10
-    clf = OneVsRestClassifier(BaggingClassifier(LinearSVC(dual=False), max_samples=1.0 / n_estimators,
-                                                    n_estimators=n_estimators))
-    clf.fit(x, y)
-    prediction = clf.predict(testX)
-
-    print("Accuracy:", metrics.accuracy_score(testY, prediction))
-    print(metrics.classification_report(testY, prediction))
-    et = time.time()
-    print("Time elapsed SVC: ", et - st)
-
-#endregion
+    #endregion
 
 if (__name__ == "__main__"):
-    NIDS()
+    dataFile = sys.argv[1]
+    classMethod = sys.argv[2]
+    task = sys.argv[3]
+    model = sys.argv[4] if len(sys.argv) > 4 else None
+
+    NIDS(dataFile, classMethod, task, model)
