@@ -34,7 +34,8 @@ class NIDS:
                     "ct_srv_src","ct_srv_dst","ct_dst_ltm","ct_src_ltm","ct_src_dport_ltm","ct_dst_sport_ltm",
                     "ct_dst_src_ltm","attack_cat","Label"]
 
-        self.modelName = "cat-"
+        if targetTask == "attack_cat":
+            self.modelName = "cat-"
 
         data = pandas.read_csv(dataFile, names=colNames, skiprows=1)
 
@@ -64,33 +65,42 @@ class NIDS:
         data['state'] = pandas.factorize(data['state'])[0]
         data['service'] = pandas.factorize(data['service'])[0]
 
-        if targetTask == 'Label':
-            #Do something
-            print("Label")
-        elif targetTask == 'attack_cat':
-            # # Make a new dataframe for predicting the attack category
-            # # It has only the rows that have an attack_cat (drop all rows where atkCat is null)
-            # atkCatData = data
-            # atkCatData.dropna(axis='rows', subset=['attack_cat'], inplace=True)
-            # We are trying to predict the attack category, so remove any rows where it is null
-            data.dropna(axis='rows', subset=['attack_cat'], inplace=True)
+        if model is None:
+            if targetTask == 'Label':
+                #Do something
+                print("Label")
+            elif targetTask == 'attack_cat':
+                # # Make a new dataframe for predicting the attack category
+                # # It has only the rows that have an attack_cat (drop all rows where atkCat is null)
+                # atkCatData = data
+                # atkCatData.dropna(axis='rows', subset=['attack_cat'], inplace=True)
+                # We are trying to predict the attack category, so remove any rows where it is null
+                data.dropna(axis='rows', subset=['attack_cat'], inplace=True)
+            else:
+                print(f"Task not recognized: {targetTask}.  Please choose 'Label' or 'attack_cat'.")
+                sys.exit()
+
+
+            self.recursiveFeatureElimination(data, targetTask, featureCols, 10)
+
+            #self.linearRegressionAnalysis(data, targetTask, featureCols)
+
+            #self.principalComponentAnalysis(data, targetTask, featureCols, 10)
+
+
+            # Split the data into training and testing sets
+            trainX, testX, trainY, testY = train_test_split(
+                data[featureCols], data[targetTask], test_size=0.2, random_state=1)  # 80% training and 20% test
+
+            self.callClassifier(classificationMethod, trainX, trainY, testX, testY)
         else:
-            print(f"Task not recognized: {targetTask}.  Please choose 'Label' or 'attack_cat'.")
-            sys.exit()
+            # Split the data into training and testing sets
+            trainX, testX, trainY, testY = train_test_split(
+                data[featureCols], data[targetTask], test_size=0.2, random_state=1)  # 80% training and 20% test
 
-
-        self.recursiveFeatureElimination(data, targetTask, featureCols, 10)
-
-        #self.linearRegressionAnalysis(data, targetTask, featureCols)
-
-        #self.principalComponentAnalysis(data, targetTask, featureCols, 10)
-
-
-        # Split the data into training and testing sets
-        labelTrainX, labelTestX, labelTrainY, labelTestY = train_test_split(
-            data[featureCols], data[targetTask], test_size=0.2, random_state=1)  # 80% training and 20% test
-
-        self.callClassifier(classificationMethod, labelTrainX, labelTrainY, labelTestX, labelTestY)
+            loaded_model = pickle.load(open(model, 'rb'))
+            result = loaded_model.score(testX, testY)
+            print(result)
 
 
 
@@ -211,7 +221,6 @@ class NIDS:
         # Save the model
         self.modelName += "DTC.sav"
         pickle.dump(clf, open(self.modelName, 'wb'))
-
 
     def logisticRegressionClassify(self, x, y, testX, testY):
         """Classify the data using linear regression"""
