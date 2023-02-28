@@ -34,6 +34,7 @@ class NIDS:
                     "ct_srv_src","ct_srv_dst","ct_dst_ltm","ct_src_ltm","ct_src_dport_ltm","ct_dst_sport_ltm",
                     "ct_dst_src_ltm","attack_cat","Label"]
 
+        self.modelName = ""
         if targetTask == "attack_cat":
             self.modelName = "cat-"
 
@@ -67,7 +68,7 @@ class NIDS:
 
         if model is None:
             if targetTask == 'Label':
-                #Do something
+                #Do nothing
                 print("Label")
             elif targetTask == 'attack_cat':
                 # # Make a new dataframe for predicting the attack category
@@ -94,13 +95,45 @@ class NIDS:
 
             self.callClassifier(classificationMethod, trainX, trainY, testX, testY)
         else:
+
+            #TODO: LOADING MODELS FROM DISK IS NOT WORKING
+            # # Load the model from disk and use it to predict
+            # loaded_model = pickle.load(open(model, 'rb'))
+            # result = loaded_model.score(testX, testY)
+            # print(result)
+
+            #TODO: Instead, use the code-generated ones to suffice as a model
+
+            # find analysis and classification function name from model input
+            analName = model[:3]
+            className = ""
+            if analName == "cat":
+                analName = model[4:7]
+                model = model[4:]
+                targetTask = "attack_cat"
+            else:
+                targetTask = "Label"
+            if analName[2] == "-":
+                analName = "LR"
+                className = model[3:6]
+            else:
+                className = model[4:7]
+
+            # call the correct functions with that
+            if analName == "LR":
+                self.linearRegressionAnalysis(data, targetTask, featureCols)
+            elif analName == "PCA":
+                # NOTE: PCA will override the classification method to be what was inputted instead of what is specified in the model name
+                self.principalComponentAnalysis(data, targetTask, featureCols, 10)
+            elif analName == "RFE":
+                self.recursiveFeatureElimination(data, targetTask, featureCols, 10)
+
             # Split the data into training and testing sets
             trainX, testX, trainY, testY = train_test_split(
                 data[featureCols], data[targetTask], test_size=0.2, random_state=1)  # 80% training and 20% test
 
-            loaded_model = pickle.load(open(model, 'rb'))
-            result = loaded_model.score(testX, testY)
-            print(result)
+            # call the correct classifier specified by the model name (except for PCA, which overrides it)
+            self.callClassifier(className.lower(), trainX, trainY, testX, testY)
 
 
 
@@ -180,7 +213,7 @@ class NIDS:
 
 
         trainX, testX, trainY, testY = train_test_split(
-             data[featureCols], data[target], test_size=0.2, random_state=1)  # 80% training and 20% test
+            data[featureCols], data[target], test_size=0.2, random_state=1)  # 80% training and 20% test
         self.modelName += "PCA-"
         self.callClassifier(sys.argv[2], trainX, trainY, testX, testY)
 
@@ -248,7 +281,7 @@ class NIDS:
 
         n_estimators = 10
         clf = OneVsRestClassifier(BaggingClassifier(LinearSVC(dual=False), max_samples=1.0 / n_estimators,
-                                                        n_estimators=n_estimators))
+                                                    n_estimators=n_estimators))
         clf.fit(x, y)
         prediction = clf.predict(testX)
 
